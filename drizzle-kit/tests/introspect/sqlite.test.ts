@@ -98,6 +98,41 @@ test('introspect checks', async () => {
 	expect(sqlStatements.length).toBe(0);
 });
 
+test('introspect checks: each table keeps only its own', async () => {
+	const sqlite = new Database(':memory:');
+
+	const schema = {
+		users: sqliteTable('users', {
+			id: int('id'),
+			age: int('age'),
+		}, (table) => ({
+			ageCheck: check('users_age_check', sql`${table.age} > 21`),
+		})),
+		posts: sqliteTable('posts', {
+			id: int('id'),
+			title: text('title'),
+		}, (table) => ({
+			titleCheck: check('posts_title_check', sql`length(${table.title}) > 0`),
+		})),
+		tags: sqliteTable('tags', {
+			id: int('id'),
+		}),
+	};
+
+	const { statements, sqlStatements } = await introspectSQLiteToFile(
+		sqlite,
+		schema,
+		'introspect-checks-per-table',
+	);
+
+	expect(statements.length).toBe(0);
+	expect(sqlStatements.length).toBe(0);
+
+	const file = fs.readFileSync('tests/introspect/sqlite/introspect-checks-per-table.ts', 'utf8');
+	expect(file.match(/users_age_check/g)?.length).toBe(1);
+	expect(file.match(/posts_title_check/g)?.length).toBe(1);
+});
+
 test('view #1', async () => {
 	const sqlite = new Database(':memory:');
 
